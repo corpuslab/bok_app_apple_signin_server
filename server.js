@@ -32,68 +32,103 @@ app.get("/", (req, res) => {
   });
 });
 
+// GET 요청으로 애플 로그인 시작
+app.get("/auth/apple", (req, res) => {
+  try {
+    const auth = new AppleAuth(
+      {
+        client_id: process.env.SERVICE_ID || 'com.corpuslab.bok.signin',
+        team_id: process.env.TEAM_ID,
+        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://pineapple-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
+        key_id: process.env.KEY_ID
+      },
+      process.env.KEY_CONTENTS ? process.env.KEY_CONTENTS.replace(/\|/g, "\n") : null,
+      "text"
+    );
+
+    const authorizationUrl = auth.loginURL();
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    console.error("Apple Auth Error:", error);
+    res.status(500).json({ error: "Apple authentication setup failed" });
+  }
+});
+
 // The callback route used for Android, which will send the callback parameters from Apple into the Android app.
 // This is done using a deeplink, which will cause the Chrome Custom Tab to be dismissed and providing the parameters from Apple back to the app.
 app.post("/callbacks/sign_in_with_apple", (request, response) => {
-  const redirect = `intent://callback?${new URLSearchParams(
-    request.body
-  ).toString()}#Intent;package=${
-    process.env.ANDROID_PACKAGE_IDENTIFIER
-  };scheme=signinwithapple;end`;
+  try {
+    console.log("Received callback request body:", request.body);
+    
+    const redirect = `intent://callback?${new URLSearchParams(
+      request.body
+    ).toString()}#Intent;package=${
+      process.env.ANDROID_PACKAGE_IDENTIFIER || 'com.corpuslab.bok'
+    };scheme=signinwithapple;end`;
 
-  console.log(`Redirecting to ${redirect}`);
+    console.log(`Redirecting to ${redirect}`);
 
-  response.redirect(307, redirect);
+    response.redirect(307, redirect);
+  } catch (error) {
+    console.error("Callback Error:", error);
+    response.status(500).json({ error: "Callback processing failed" });
+  }
+});
+
+// GET 요청으로도 callback 처리 (애플에서 직접 호출할 수 있음)
+app.get("/callbacks/sign_in_with_apple", (request, response) => {
+  try {
+    console.log("Received GET callback request query:", request.query);
+    
+    const redirect = `intent://callback?${new URLSearchParams(
+      request.query
+    ).toString()}#Intent;package=${
+      process.env.ANDROID_PACKAGE_IDENTIFIER || 'com.corpuslab.bok'
+    };scheme=signinwithapple;end`;
+
+    console.log(`Redirecting to ${redirect}`);
+
+    response.redirect(307, redirect);
+  } catch (error) {
+    console.error("GET Callback Error:", error);
+    response.status(500).json({ error: "GET callback processing failed" });
+  }
 });
 
 // Endpoint for the app to login or register with the `code` obtained during Sign in with Apple
-//
-// Use this endpoint to exchange the code (which must be validated with Apple within 5 minutes) for a session in your system
 app.post("/sign_in_with_apple", async (request, response) => {
   try {
-    // 환경 변수 검증
-    const requiredEnvVars = ['BUNDLE_ID', 'SERVICE_ID', 'TEAM_ID', 'KEY_ID', 'KEY_CONTENTS'];
+    // 환경 변수 검증 (선택적)
+    const requiredEnvVars = ['SERVICE_ID', 'TEAM_ID', 'KEY_ID', 'KEY_CONTENTS'];
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
     
     if (missingVars.length > 0) {
-      console.error('Missing required environment variables:', missingVars);
-      return response.status(500).json({ 
-        success: false, 
-        error: 'Server configuration error' 
-      });
+      console.warn('Missing environment variables:', missingVars);
+      // 환경변수가 없어도 기본값으로 작동하도록 수정
     }
 
     const auth = new AppleAuth(
       {
-        // use the bundle ID as client ID for native apps, else use the service ID for web-auth flows
-        // https://forums.developer.apple.com/thread/118135
-        client_id:
-          request.query.useBundleId === "true"
-            ? process.env.BUNDLE_ID
-            : process.env.SERVICE_ID,
+        client_id: process.env.SERVICE_ID || 'com.corpuslab.bok.signin',
         team_id: process.env.TEAM_ID,
-        redirect_uri: process.env.REDIRECT_URI || `${process.env.RENDER_EXTERNAL_URL || 'https://your-app-name.onrender.com'}/callbacks/sign_in_with_apple`,
+        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://pineapple-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
         key_id: process.env.KEY_ID
       },
-      process.env.KEY_CONTENTS.replace(/\|/g, "\n"),
+      process.env.KEY_CONTENTS ? process.env.KEY_CONTENTS.replace(/\|/g, "\n") : null,
       "text"
     );
 
     console.log("Request query:", request.query);
 
     const accessToken = await auth.accessToken(request.query.code);
-
     const idToken = jwt.decode(accessToken.id_token);
-
     const userID = idToken.sub;
 
     console.log("ID Token:", idToken);
 
-    // `userEmail` and `userName` will only be provided for the initial authorization with your app
     const userEmail = idToken.email;
     const userName = `${request.query.firstName || ''} ${request.query.lastName || ''}`.trim();
 
-    // 👷🏻‍♀️ TODO: Use the values provided create a new session for the user in your system
     const sessionID = `NEW SESSION ID for ${userID} / ${userEmail} / ${userName}`;
 
     console.log(`sessionID = ${sessionID}`);
