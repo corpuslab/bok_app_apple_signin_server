@@ -39,7 +39,7 @@ app.get("/auth/apple", (req, res) => {
       {
         client_id: process.env.SERVICE_ID || 'com.corpuslab.bok.signin',
         team_id: process.env.TEAM_ID,
-        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://pineapple-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
+        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://bok-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
         key_id: process.env.KEY_ID
       },
       process.env.KEY_CONTENTS ? process.env.KEY_CONTENTS.replace(/\|/g, "\n") : null,
@@ -111,7 +111,7 @@ app.post("/sign_in_with_apple", async (request, response) => {
       {
         client_id: process.env.SERVICE_ID || 'com.corpuslab.bok.signin',
         team_id: process.env.TEAM_ID,
-        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://pineapple-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
+        redirect_uri: `${process.env.RENDER_EXTERNAL_URL || 'https://bok-app-apple-signin-server.onrender.com'}/callbacks/sign_in_with_apple`,
         key_id: process.env.KEY_ID
       },
       process.env.KEY_CONTENTS ? process.env.KEY_CONTENTS.replace(/\|/g, "\n") : null,
